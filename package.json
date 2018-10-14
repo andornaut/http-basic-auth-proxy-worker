@@ -1,6 +1,6 @@
 {
   "name": "http-basic-auth-proxy-worker",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "author": "andornaut",
   "description": "A service worker that proxies browser-initiated fetch request to support HTTP Basic Authentication",
   "keywords": [
