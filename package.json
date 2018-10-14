@@ -1,0 +1,29 @@
+{
+  "name": "http-basic-auth-proxy-worker",
+  "version": "0.0.0",
+  "author": "andornaut",
+  "description": "A service worker that proxies browser-initiated fetch request to support HTTP Basic Authentication",
+  "keywords": [
+    "http basic authentication",
+    "basic authentication",
+    "service workers"
+  ],
+  "license": "MIT",
+  "main": "index.js",
+  "bugs": {
+    "url": "https://github.com/andornaut/http-basic-auth-proxy-worker/issues"
+  },
+  "homepage": "https://github.com/andornaut/http-basic-auth-proxy-worker#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andornaut/http-basic-auth-proxy-worker.git"
+  },
+  "devDependencies": {
+    "eslint": "^5.6.1",
+    "eslint-config-airbnb": "^17.1.0",
+    "prettier-eslint-cli": "^4.7.1"
+  },
+  "scripts": {
+    "format": "prettier-eslint --write '*.{js,md}'"
+  }
+}
