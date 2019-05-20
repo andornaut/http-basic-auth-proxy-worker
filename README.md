@@ -37,18 +37,25 @@ module.exports = {
 Register the service-worker in your entrypoint script, and pass it its initial configuration.
 
 ```javascript
-window.addEventListener("load", async () => {
-  const registration = await window.navigator.serviceWorker.register(
-    "./worker.js"
-  );
-  const serviceWorker = registration.active;
-  if (serviceWorker) {
-    serviceWorker.postMessage({
-      baseURL: "https://example.com/",
-      proxyBaseURL: `${window.location.href}proxy/`,
-      username: "username",
-      password: "password"
-    });
+if (!navigator.serviceWorker) {
+  throw new Error('Cannot initialize, because the Service Worker API is not available.');
+}
+
+const init = () => {
+  navigator.serviceWorker.controller.postMessage({
+    baseURL: "https://example.com/",
+    proxyBaseURL: `${window.location.origin}/proxy/`,
+    username: "username",
+    password: "password"
+  });
+};
+
+// Triggered when a new worker is activated.
+navigator.serviceWorker.addEventListener('controllerchange', init);
+
+navigator.serviceWorker.register('./worker.js').then((registration) => {
+  if (registration.active) {
+    init();
   }
 });
 ```
@@ -60,7 +67,7 @@ The service worker must be configured before it can be used.
 | Name         | Description                                                                                                                                                                   |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | baseURL      | **Required** The destination/backend base URL to proxy requests to.                                                                                                           |
-| proxyBaseURL | **Required** The base URL of requests that you wish to proxy. Matching fetch requests will be proxied; others will be ignored.                                                |
+| proxyBaseURL | **Required** The base URL of requests that you wish to proxy. Must match the origin of the service worker.                                                                    |
 | username     | If present, an HTTP Basic Authentication header will be added, and the [`request.mode`](https://developer.mozilla.org/en-US/docs/Web/API/Request/mode) will be set to 'cors'. |
 | password     | See "username" above.                                                                                                                                                         |
 

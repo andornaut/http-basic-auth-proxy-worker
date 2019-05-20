@@ -19,7 +19,7 @@ const withAuthHeader = (headers, authHeader) => {
   return updatedHeaders;
 };
 
-const cloneCORSRequest = (request, authHeader, backendURL) =>
+const toAuthenticatedRequest = (backendURL, request, authHeader) =>
   new Request(backendURL, {
     body: request.body,
     cache: request.cache,
@@ -39,13 +39,9 @@ const proxy = request => {
   const authHeader = getAuthHeader();
   const backendURL = toBackendURL(request.url);
   const proxyRequest = authHeader
-    ? cloneCORSRequest(request, authHeader, backendURL)
+    ? toAuthenticatedRequest(backendURL, request, authHeader)
     : new Request(backendURL, request);
   return fetch(proxyRequest);
-};
-
-self.onmessage = ({ data }) => {
-  config = data;
 };
 
 self.addEventListener("fetch", event => {
@@ -54,4 +50,22 @@ self.addEventListener("fetch", event => {
     return;
   }
   event.respondWith(proxy(request));
+});
+
+self.addEventListener('message', ({ data }) => {
+  const { proxyBaseURL } = data;
+  const configOrigin = (new URL(proxyBaseURL)).origin;
+  if (configOrigin !== self.origin) {
+    throw new Error(
+      `Error initializing service worker. proxyBaseURL's origin "${configOrigin}" must match origin "${self.origin}"`);
+  }
+  config = data;
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
 });
