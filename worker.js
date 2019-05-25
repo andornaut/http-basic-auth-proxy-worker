@@ -1,71 +1,77 @@
-const AUTH_HEADER_NAME = "Authorization";
+// This service worker may terminated at any time, so this cache won't last very long.
+let configCache = null;
 
-let config = {}; // { baseURL, proxyBaseURL, username, password }
-
-const toBackendURL = url => url.replace(config.proxyBaseURL, config.baseURL);
-
-const getAuthHeader = () => {
-  const { username, password } = config;
-  if (!username) {
-    return null;
+const getConfig = async (clientId) => {
+  if (configCache) {
+    return configCache;
   }
-  const credentials = !password ? username : `${username}:${password}`;
-  return `Basic ${btoa(credentials)}`;
+  if (!clientId) {
+    return;
+  }
+
+  let client;
+  try {
+    client = await clients.get(clientId);
+  } catch {
+    return;
+  }
+
+  const messageChannel = new MessageChannel();
+  const messagePromise = new Promise((resolve, reject) => {
+    messageChannel.port1.onmessage = (event) => {
+      const config = event.data.error ? null : event.data;
+      resolve(config);
+    };
+  });
+  client.postMessage('get-configuration', [messageChannel.port2]);
+
+  const config = await messagePromise;
+  if (!config) {
+    return;
+  }
+
+  configCache = config;
+  return config;
 };
 
-const withAuthHeader = (headers, authHeader) => {
+const withAuthHeader = (headers, { username, password }) => {
+  const credentials = !password ? username : `${username}:${password}`;
   const updatedHeaders = new Headers(headers);
-  updatedHeaders.append(AUTH_HEADER_NAME, authHeader);
+  updatedHeaders.append('Authorization', `Basic ${btoa(credentials)}`);
   return updatedHeaders;
 };
 
-const toAuthenticatedRequest = (backendURL, request, authHeader) =>
-  new Request(backendURL, {
-    body: request.body,
-    cache: request.cache,
-    credentials: request.credentials,
-    headers: withAuthHeader(request.headers, authHeader),
-    integrity: request.integrity,
-    method: request.method,
-    mode: "cors",
-    redirect: request.redirect,
-    referrer: request.referrer,
-    referrerPolicy: request.referrerPolicy
-  });
+const proxyRequest = async ({ clientId, request }) => {
+  const config = await getConfig(clientId);
+  if (!config || !request.url.startsWith(config.baseUrl)) {
+    return fetch(request);
+  }
 
-const proxy = request => {
-  // If there's an authHeader then send a request with mode='cors';
-  // otherwise, just fetch from the backend URL.
-  const authHeader = getAuthHeader();
-  const backendURL = toBackendURL(request.url);
-  const proxyRequest = authHeader
-    ? toAuthenticatedRequest(backendURL, request, authHeader)
-    : new Request(backendURL, request);
-  return fetch(proxyRequest);
+  const options = config.username ? { headers: withAuthHeader(request.headers, config) } : {};
+  if (request.origin !== self.origin){
+    options.mode = 'cors';
+  }
+  return fetch(new Request(request, options));
 };
-
-self.addEventListener("fetch", event => {
-  const { request } = event;
-  if (!request.url.startsWith(config.proxyBaseURL)) {
-    return;
-  }
-  event.respondWith(proxy(request));
-});
-
-self.addEventListener('message', ({ data }) => {
-  const { proxyBaseURL } = data;
-  const configOrigin = (new URL(proxyBaseURL)).origin;
-  if (configOrigin !== self.origin) {
-    throw new Error(
-      `Error initializing service worker. proxyBaseURL's origin "${configOrigin}" must match origin "${self.origin}"`);
-  }
-  config = data;
-});
 
 self.addEventListener('activate', event => {
   event.waitUntil(self.clients.claim());
 });
 
+self.addEventListener('fetch', (event) => {
+  // Avoid a deadlock which can occur if this service worker attempts to fetch the script which has the proxy config.
+  // This can occur when the browser is refreshed after this service worker is registered.
+  if (event.request.destination === 'script') {
+    return;
+  }
+  event.respondWith(proxyRequest(event));
+});
+
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('message', () => {
+  // Invalidate cache
+  configCache = null;
 });

@@ -1,15 +1,19 @@
 # http-basic-auth-proxy-worker
 
-A [service worker](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API) that proxies browser-initiated
-fetch request to support
+A [service worker](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API) that proxies fetch request in
+order to support
 [HTTP Basic Authentication](https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication#Basic_authentication_scheme).
 
-This is useful to support HTTP Basic Authentication in
+This can be used to support HTTP Basic Authentication in
 [`<audio>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/audio) and
-[`<video>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/video) elements.
-Previously, you could include credentials in `src` URLs (eg. `<video src="https://USERNAME:PASSWORD@example.com">`), but
-this is now
-[disallowed by some web browsers](https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication#Access_using_credentials_in_the_URL).
+[`<video>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/video) elements that
+[are not permitted to include credentials](https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication#Access_using_credentials_in_the_URL).
+in `src` URLs (eg. `<video src="https://USERNAME:PASSWORD@example.com">`).
+
+Additionally, if the `request.origin` does not match this service worker's origin, then the
+[`request.mode`](https://developer.mozilla.org/en-US/docs/Web/API/Request/mode) will be set to "cors".
+
+Resources in [`<script>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script) elements are *not* proxied.
 
 ## Getting Started
 
@@ -19,13 +23,11 @@ Install from [npm](https://www.npmjs.com/package/http-basic-auth-proxy-worker).
 npm install --save http-basic-auth-proxy-worker
 ```
 
-Install the `worker.js` file at the root of your application or at a location that matches
-your desired
+Install the `worker.js` file at the root of your application or at a location that matches your desired
 [scope](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerRegistration/scope).
 
-### Example webpack configuration
-
 ```javascript
+// webpack.config.js
 module.exports = {
   entry: {
     main: "./src/index.js",
@@ -34,46 +36,46 @@ module.exports = {
 };
 ```
 
-Register the service-worker in your entrypoint script, and pass it its initial configuration.
+Register the service worker in your entrypoint script:
 
 ```javascript
-if (!navigator.serviceWorker) {
-  throw new Error('Cannot initialize, because the Service Worker API is not available.');
-}
-
-const init = () => {
-  navigator.serviceWorker.controller.postMessage({
-    baseURL: "https://example.com/",
-    proxyBaseURL: `${window.location.origin}/proxy/`,
-    username: "username",
-    password: "password"
-  });
+// index.js
+const config = {
+  baseUrl: "https://example.com/",
+  username: "username",
+  password: "password"
 };
 
-// Triggered when a new worker is activated.
-navigator.serviceWorker.addEventListener('controllerchange', init);
-
-navigator.serviceWorker.register('./worker.js').then((registration) => {
-  if (registration.active) {
-    init();
-  }
+navigator.serviceWorker.addEventListener("message", event => {
+  event.ports[0].postMessage(config);
 });
+
+navigator.serviceWorker.register("./worker.js");
+```
+
+This service worker sends its client(s) a message to request a configuration object.
+This service worker maintains a cache of its configuration, but a client can invalidate this cache by sending the
+a message:
+
+```javascript
+// You can specify any message text; it is not used.
+navigator.serviceWorker.controller.postMessage("");
 ```
 
 ## Configuration
 
-The service worker must be configured before it can be used.
+This service worker must be configured before it can be used.
+The configuration object may contain the following properties:
 
-| Name         | Description                                                                                                                                                                   |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| baseURL      | **Required** The destination/backend base URL to proxy requests to.                                                                                                           |
-| proxyBaseURL | **Required** The base URL of requests that you wish to proxy. Must match the origin of the service worker.                                                                    |
-| username     | If present, an HTTP Basic Authentication header will be added, and the [`request.mode`](https://developer.mozilla.org/en-US/docs/Web/API/Request/mode) will be set to 'cors'. |
-| password     | See "username" above.                                                                                                                                                         |
+| Name     | Description                                                                                                   |
+| -------- | ------------------------------------------------------------------------------------------------------------- |
+| baseUrl  | **Required** A URL prefix. If a fetched `request.url` begins with the "baseUrl", then it will be proxied.     |
+| username | If present, an HTTP Basic Authentication header will be included in proxied requests.                         |
+| password | If present, this value will be added to the HTTP Basic Authentication header. Ignored if "username" is empty. |
 
 ## Web Server
 
-You must configure your web server to support [CORS requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS),
+You may need to configure your web server to support [CORS requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS),
 by adding the requisite access control headers:
 
 ### Example Nginx configuration
@@ -100,3 +102,16 @@ location / {
     }
 }
 ```
+
+## Developing
+
+### Chrome
+
+- Navigate to chrome://flags/#unsafely-treat-insecure-origin-as-secure.
+- Enable this option, and then add your local domain to this list, eg. "localhost"
+
+### Firefox
+
+- Navigate to about:debugging#workers 
+- Disable "multi content processes" by setting “dom.ipc.multiOptOut” to `true` in about:config.
+
