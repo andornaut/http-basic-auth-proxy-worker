@@ -1,4 +1,4 @@
-// This service worker may terminated at any time, so this cache won't last very long.
+// This service worker may terminated at any time, so this cache may be reset.
 let configCache = null;
 
 const getConfig = async clientId => {
@@ -30,6 +30,7 @@ const getConfig = async clientId => {
     return;
   }
 
+  // Update cache
   configCache = config;
   return config;
 };
@@ -41,14 +42,27 @@ const withAuthHeader = (headers, { username, password }) => {
   return updatedHeaders;
 };
 
-const proxyRequest = async ({ clientId, request }) => {
+const proxyFetch = async ({ clientId, request }) => {
   const config = await getConfig(clientId);
-  if (!config || !config.username || !request.url.startsWith(config.baseUrl)) {
-    return fetch(request);
+  const options = {};
+
+  // Do not proxy if doing so would trigger a bug that can occur when Chrome Dev Tools is open.
+  // If a "username" is supplied, then the request.mode will not be 'same-origin', which will trigger this bug.
+  // https://stackoverflow.com/a/49719964
+  // https://bugs.chromium.org/p/chromium/issues/detail?id=823392
+  if (
+    request.cache === "only-if-cached" &&
+    (request.mode !== "same-origin" || (config && config.username))
+  ) {
+    options.cache = "default";
   }
 
-  const options = { headers: withAuthHeader(request.headers, config) };
-  return fetch(new Request(request, options));
+  if (config && config.username && request.url.startsWith(config.baseUrl)) {
+    options.credentials = "include";
+    options.headers = withAuthHeader(request.headers, config);
+    options.mode = "cors";
+  }
+  return fetch(request, options);
 };
 
 self.addEventListener("activate", event => {
@@ -61,7 +75,7 @@ self.addEventListener("fetch", event => {
   if (event.request.destination === "script") {
     return;
   }
-  event.respondWith(proxyRequest(event));
+  event.respondWith(proxyFetch(event));
 });
 
 self.addEventListener("install", event => {
