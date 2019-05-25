@@ -6,11 +6,11 @@ order to support
 
 This can be used to support HTTP Basic Authentication in
 [`<audio>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/audio) and
-[`<video>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/video) elements that
-[are not permitted to include credentials](https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication#Access_using_credentials_in_the_URL).
-in `src` URLs (eg. `<video src="https://USERNAME:PASSWORD@example.com">`).
+[`<video>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/video) elements, which
+[are not permitted to include credentials](https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication#Access_using_credentials_in_the_URL)
+in `src` attributes, eg. `<video src="https://USERNAME:PASSWORD@example.com">`.
 
-Web browsers usually prompt the user to enter access credentials when page resources require HTTP Basic Authentication,
+Web browsers usually prompt the user to enter access credentials when resources require HTTP Basic Authentication,
 but this service worker can be used to avoid this prompt in cases where the access credentials are already known.
 
 Note that resources whose `request.destination` is a [`<script>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script)
@@ -44,7 +44,7 @@ Register the service worker in your entrypoint script:
 const config = {
   baseUrl: "https://example.com/",
   username: "username",
-  password: "password"
+  password: "password",
 };
 
 navigator.serviceWorker.addEventListener("message", event => {
@@ -54,19 +54,19 @@ navigator.serviceWorker.addEventListener("message", event => {
 navigator.serviceWorker.register("./worker.js");
 ```
 
-This service worker sends its client(s) a message to request a configuration object.
-This service worker maintains a cache of its configuration, but a client can invalidate this cache by sending the
+This service worker sends its client(s) messages to request configuration.
+This service worker maintains a cache of its configuration, but clients can invalidate this cache by sending the
 a message:
 
 ```javascript
-// You can specify any message text; it is not used.
-navigator.serviceWorker.controller.postMessage("");
+// You can specify arbitrary message payload.
+navigator.serviceWorker.controller.postMessage("invalidate-cache");
 ```
 
 ## Configuration
 
-This service worker must be configured before it can be used.
-The configuration object may contain the following properties:
+This service worker must be configured in order for it to proxy requests.
+The configuration object should contain the following properties:
 
 | Name     | Description                                                                                               |
 | -------- | --------------------------------------------------------------------------------------------------------- |
