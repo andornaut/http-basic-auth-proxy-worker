@@ -10,10 +10,8 @@ This can be used to support HTTP Basic Authentication in
 [are not permitted to include credentials](https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication#Access_using_credentials_in_the_URL).
 in `src` URLs (eg. `<video src="https://USERNAME:PASSWORD@example.com">`).
 
-Additionally, if the `request.origin` does not match this service worker's origin, then the
-[`request.mode`](https://developer.mozilla.org/en-US/docs/Web/API/Request/mode) will be set to "cors".
-
-Resources in [`<script>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script) elements are *not* proxied.
+Resources whose `request.destination` is a [`<script>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script)
+element are _not_ proxied.
 
 ## Getting Started
 
@@ -67,11 +65,11 @@ navigator.serviceWorker.controller.postMessage("");
 This service worker must be configured before it can be used.
 The configuration object may contain the following properties:
 
-| Name     | Description                                                                                                   |
-| -------- | ------------------------------------------------------------------------------------------------------------- |
-| baseUrl  | **Required** A URL prefix. If a fetched `request.url` begins with the "baseUrl", then it will be proxied.     |
-| username | If present, an HTTP Basic Authentication header will be included in proxied requests.                         |
-| password | If present, this value will be added to the HTTP Basic Authentication header. Ignored if "username" is empty. |
+| Name     | Description                                                                                               |
+| -------- | --------------------------------------------------------------------------------------------------------- |
+| baseUrl  | **Required** A URL prefix. If a fetched `request.url` begins with the "baseUrl", then it will be proxied. |
+| username | **Required** The username to include in the HTTP Basic Authentication header.                             |
+| password | The password to include in the HTTP Basic Authentication header.                                          |
 
 ## Web Server
 
@@ -112,6 +110,5 @@ location / {
 
 ### Firefox
 
-- Navigate to about:debugging#workers 
+- Navigate to about:debugging#workers
 - Disable "multi content processes" by setting “dom.ipc.multiOptOut” to `true` in about:config.
-

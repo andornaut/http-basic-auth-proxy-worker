@@ -1,7 +1,7 @@
 // This service worker may terminated at any time, so this cache won't last very long.
 let configCache = null;
 
-const getConfig = async (clientId) => {
+const getConfig = async clientId => {
   if (configCache) {
     return configCache;
   }
@@ -18,12 +18,12 @@ const getConfig = async (clientId) => {
 
   const messageChannel = new MessageChannel();
   const messagePromise = new Promise((resolve, reject) => {
-    messageChannel.port1.onmessage = (event) => {
+    messageChannel.port1.onmessage = event => {
       const config = event.data.error ? null : event.data;
       resolve(config);
     };
   });
-  client.postMessage('get-configuration', [messageChannel.port2]);
+  client.postMessage("get-configuration", [messageChannel.port2]);
 
   const config = await messagePromise;
   if (!config) {
@@ -37,41 +37,38 @@ const getConfig = async (clientId) => {
 const withAuthHeader = (headers, { username, password }) => {
   const credentials = !password ? username : `${username}:${password}`;
   const updatedHeaders = new Headers(headers);
-  updatedHeaders.append('Authorization', `Basic ${btoa(credentials)}`);
+  updatedHeaders.append("Authorization", `Basic ${btoa(credentials)}`);
   return updatedHeaders;
 };
 
 const proxyRequest = async ({ clientId, request }) => {
   const config = await getConfig(clientId);
-  if (!config || !request.url.startsWith(config.baseUrl)) {
+  if (!config || !config.username || !request.url.startsWith(config.baseUrl)) {
     return fetch(request);
   }
 
-  const options = config.username ? { headers: withAuthHeader(request.headers, config) } : {};
-  if (request.origin !== self.origin){
-    options.mode = 'cors';
-  }
+  const options = { headers: withAuthHeader(request.headers, config) };
   return fetch(new Request(request, options));
 };
 
-self.addEventListener('activate', event => {
+self.addEventListener("activate", event => {
   event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener('fetch', (event) => {
-  // Avoid a deadlock which can occur if this service worker attempts to fetch the script which has the proxy config.
+self.addEventListener("fetch", event => {
+  // Avoid a deadlock that can occur if this service worker attempts to fetch the script that has its configuration.
   // This can occur when the browser is refreshed after this service worker is registered.
-  if (event.request.destination === 'script') {
+  if (event.request.destination === "script") {
     return;
   }
   event.respondWith(proxyRequest(event));
 });
 
-self.addEventListener('install', (event) => {
+self.addEventListener("install", event => {
   event.waitUntil(self.skipWaiting());
 });
 
-self.addEventListener('message', () => {
+self.addEventListener("message", () => {
   // Invalidate cache
   configCache = null;
 });
