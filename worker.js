@@ -58,7 +58,6 @@ const proxyFetch = async ({ clientId, request }) => {
   }
 
   if (config && config.username && request.url.startsWith(config.baseUrl)) {
-    options.credentials = "include";
     options.headers = withAuthHeader(request.headers, config);
     options.mode = "cors";
   }
